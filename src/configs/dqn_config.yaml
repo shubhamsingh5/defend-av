@@ -1,0 +1,27 @@
+# Run settings
+mode: train  # train or eval
+render: false
+record: false
+checkpoint: null  # path to checkpoint for evaluation
+
+# DQN Hyperparameters
+learning_rate: 0.001
+gamma: 0.99
+hidden_size: 256
+episodes: 1000
+train_freq: 100
+min_samples: 1000
+batch_size: 320
+short_episode_threshold: 100
+max_short_episodes: 5
+action_step_size: 0.25
+# Exploration
+epsilon_start: 1.0
+epsilon_end: 0.01
+epsilon_decay: 0.995
+
+# Memory
+buffer_size: 100000
+
+# Network update
+target_update_freq: 1000

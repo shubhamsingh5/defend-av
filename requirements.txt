@@ -1,0 +1,21 @@
+# Core dependencies
+numpy>=1.21.0
+torch>=2.0.0
+gymnasium>=0.29.0
+
+# Environment
+git+https://github.com/axelbr/racecar_gym.git
+
+# Visualization and logging
+matplotlib>=3.5.0
+seaborn>=0.11.0
+tqdm>=4.65.0
+PyYAML>=6.0
+
+# Optional - for video recording
+opencv-python>=4.5.0
+
+# Development tools
+pytest>=7.0.0
+black>=22.0.0
+flake8>=4.0.0
