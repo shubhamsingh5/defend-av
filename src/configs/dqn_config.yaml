@@ -3,6 +3,7 @@ mode: train  # train or eval
 render: false
 record: false
 checkpoint: null  # path to checkpoint for evaluation
+agent: 'ppo'
 
 # DQN Hyperparameters
 learning_rate: 0.001

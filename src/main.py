@@ -9,6 +9,7 @@ from pathlib import Path
 from datetime import datetime
 
 from agents.dqn_agent import DQNAgent
+from agents.ppo_agent import PPOAgent
 from common.env_wrapper import RacecarWrapper
 from scripts.train import train
 
@@ -79,8 +80,10 @@ def setup_logging(config):
 
 def main():
     # Load configuration
-    config = load_config()
-    print("Loaded config:", config)
+    algo = 'dqn' # toggle between 'dqn' and 'ppo'
+    config_path = f'src/configs/{algo}_config.yaml'
+    config = load_config(config_path)
+    print(f"Loaded {algo.upper()} config:", config)
     
     # Setup environment and wrapper
     render_mode = 'rgb_array_follow' if config['render'] else 'human'
@@ -107,7 +110,7 @@ def main():
         visualizer.init_screen()
     
     # Create agent
-    agent = DQNAgent(state_dim, action_dim, config)
+    agent = DQNAgent(state_dim, action_dim, config) if algo == 'dqn' else PPOAgent(state_dim, action_dim, config)
     
     # Load checkpoint if provided
     if config['checkpoint']:
