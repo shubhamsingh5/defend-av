@@ -14,9 +14,9 @@ frame_skip: 4  # Skip frames for faster stepping when using camera
 gamma: 0.99
 hidden_size: 512
 episodes: 10000
-train_freq: 10
+train_freq: 25
 min_samples: 2000
-batch_size: 256
+batch_size: 1024
 short_episode_threshold: 100
 max_short_episodes: 5
 
@@ -32,6 +32,6 @@ target_update_freq: 10
 actor_lr: 0.0003
 critic_lr: 0.001
 ppo_epochs: 10
-clip_param: 0.2
-gae_lambda: 0.95
+clip_param: 0.15
+gae_lambda: 0.98
 min_std: 1e-6

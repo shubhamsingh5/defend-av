@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from models.ppo import Actor, Critic
+from common.utils import get_dynamic_steering_scale
 
 class PPOAgent:
     def __init__(self, state_dim, action_dim, config):
@@ -69,7 +70,7 @@ class PPOAgent:
                 
         # Update exploration and curriculum
         self.current_std = max(self.std_min, self.current_std * self.std_decay)
-        self.speed_scale = min(1.0, self.speed_scale + 0.000001)  # Gradually increase speed
+        self.speed_scale = min(1.0, self.speed_scale + 0.00001)  # Gradually increase speed
         
         action_np = action.cpu().squeeze(0).numpy()
         
@@ -77,11 +78,14 @@ class PPOAgent:
         if len(self.buffer['actions']) > 0:
             prev_action = self.buffer['actions'][-1]
             action_np = self.action_momentum * prev_action + (1 - self.action_momentum) * action_np
-        
+            
+        lidar_data = state[6:]
+        steering_scale = get_dynamic_steering_scale(lidar_data)
+        print(f"Steering scale: {steering_scale}")
         # Convert actions
         motor = 0.1 * (action_np[0] + 1.0)  # Convert to [0,1]
         motor = 0.2 + (1.0 - 0.2) * motor * self.speed_scale  # Apply curriculum
-        steering = np.clip(action_np[1] * 0.01, -1, 1)
+        steering = np.clip(action_np[1] * steering_scale, -1, 1)
         
         return {
             'motor': float(motor),

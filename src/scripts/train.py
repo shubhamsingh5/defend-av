@@ -184,7 +184,9 @@ def train(env, agent, config, log_dir, visualizer):
             'loss': f'{avg_episode_loss:.3e}' if episode_loss else 'N/A',
             'samples': total_steps,
             'short_eps': short_episode_counter,
-            'steps': episode_steps        # Add current episode steps
+            'steps': episode_steps,
+            'std': f'{agent.current_std:.2f}',
+            'speed_scale': f'{agent.speed_scale:.2f}'
         })
     
     # Final saves
