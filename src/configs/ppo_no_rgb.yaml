@@ -6,17 +6,17 @@ checkpoint: null  # path to checkpoint for evaluation
 scenario: 'austria.yml'  # Scenario file name
 
 # Model settings
-model_type: dqn  # dqn or ppo
+model_type: ppo  # dqn or ppo
 use_camera: false  # Enable or disable the use of RGB camera
 frame_skip: 4  # Skip frames for faster stepping when using camera
 
 # General Hyperparameters
 gamma: 0.99
-hidden_size: 256
-episodes: 1000
-train_freq: 100
-min_samples: 1000
-batch_size: 320
+hidden_size: 512
+episodes: 10000
+train_freq: 10
+min_samples: 2000
+batch_size: 256
 short_episode_threshold: 100
 max_short_episodes: 5
 

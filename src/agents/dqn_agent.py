@@ -29,6 +29,10 @@ class DQNAgent(BaseAgent):
         self.action_step_size = config['action_step_size']
         self.batch_size = config['batch_size']
         self.target_update_freq = config['target_update_freq']
+        self.num_motor_bins = 15  # Number of discrete motor actions
+        self.num_steering_bins = 15  # Number of discrete steering actions
+        self.motor_step_size = 2.0 / (self.num_motor_bins - 1)  # Step size for motor
+        self.steering_step_size = 2.0 / (self.num_steering_bins - 1)  # Step size for steering
         
         # Initialize optimizer
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=config['learning_rate'])
@@ -37,33 +41,8 @@ class DQNAgent(BaseAgent):
         self.memory = ReplayBuffer(capacity=config['buffer_size'])
 
     def process_state(self, state):
-        """Convert state dict to tensor"""
-        try:
-            if isinstance(state, dict):
-                # Handle dictionary observation (unwrapped environment)
-                state_components = []
-                
-                # Add components in a specific order
-                for key in ['pose', 'velocity', 'acceleration', 'lidar', 'time']:
-                    if key in state:
-                        val = np.array(state[key], dtype=np.float32).flatten()
-                        state_components.append(val)
-                
-                if not state_components:
-                    raise ValueError(f"No valid components found in state: {state.keys()}")
-                
-                state_vector = np.concatenate(state_components)
-                return torch.FloatTensor(state_vector)
-            else:
-                # Handle already processed state (from wrapper)
-                return torch.FloatTensor(state)
-                
-        except Exception as e:
-            print(f"Error in process_state: {e}")
-            print(f"State type: {type(state)}")
-            if isinstance(state, dict):
-                print(f"State keys: {state.keys()}")
-            raise e
+        """Convert numpy state to tensor"""
+        return torch.FloatTensor(state)
 
     def select_action(self, state, training=True):
         if training and random.random() < self.epsilon:
@@ -82,8 +61,12 @@ class DQNAgent(BaseAgent):
             motor_idx = action_idx % 9
             steering_idx = action_idx // 9
             
-            motor = motor_idx * self.action_step_size - 1.0  # [-1, 1]
-            steering = steering_idx * self.action_step_size - 1.0  # [-1, 1]
+            motor = motor_idx * self.motor_step_size - 1.0  # Normalize to [-1, 1]
+            steering = steering_idx * self.steering_step_size - 1.0  # Normalize to [-1, 1]
+            
+            # Clip values to ensure they're in [-1, 1]
+            motor = np.clip(motor, -1.0, 1.0)
+            steering = np.clip(steering, -1.0, 1.0)
             
             return {
                 'motor': motor,
@@ -101,6 +84,10 @@ class DQNAgent(BaseAgent):
         # Convert continuous actions to discrete indices
         motor_idx = int((action['motor'] + 1) / 0.25)
         steering_idx = int((action['steering'] + 1) / 0.25)
+        
+        motor_idx = np.clip(motor_idx, 0, self.num_motor_bins - 1)
+        steering_idx = np.clip(steering_idx, 0, self.num_steering_bins - 1)
+        
         action_idx = motor_idx + steering_idx * 9
         
         self.memory.push(state_np, 

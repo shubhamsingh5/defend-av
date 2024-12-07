@@ -1,3 +1,5 @@
+import time
+import cv2
 import gymnasium as gym
 import numpy as np
 
@@ -7,33 +9,57 @@ class RacecarWrapper(gym.Wrapper):
         self.env = env
 
     def _process_observation(self, obs_dict):
-        """Process the observation to a simpler representation"""
-        # All these values are numpy arrays in the observation dict
-        pose = obs_dict['pose']          # [x, y, z, roll, pitch, yaw]
-        velocity = obs_dict['velocity']   # [x, y, z, roll, pitch, yaw]
-        lidar = obs_dict['lidar']        # distances array
+        pose = obs_dict['pose']
+        velocity = obs_dict['velocity']
+        lidar = obs_dict['lidar']
 
-        # Extract relevant features
-        position = pose[:2]               # x, y only
-        speed = velocity[:2]              # x, y only
-        orientation = pose[5:6]           # yaw only
-        distances = lidar[::10]           # downsample lidar (every 10th reading)
+        # 1. Convert LiDAR to polar coordinates with higher resolution
+        num_angles = lidar.shape[0]
+        full_lidar_angle = np.pi * 270 / 180  # 270 degrees FOV
+        angles = np.linspace(-full_lidar_angle / 2, full_lidar_angle / 2, num_angles)
+        
+        # Extract more granular distances instead of fixed key angles
+        # Here, we sample distances at every 15-degree interval for richer input
+        angular_step = np.pi / 12  # 15 degrees
+        key_angles = np.arange(-full_lidar_angle / 2, full_lidar_angle / 2 + angular_step, angular_step)
+        key_indices = np.clip(np.searchsorted(angles, key_angles), 0, num_angles - 1)
+        distances = lidar[key_indices]
 
-        # Normalize values
-        position_normalized = position / 100.0
-        speed_normalized = speed / 20.0
-        orientation_normalized = orientation / np.pi
-        distances_normalized = np.clip(distances, 0, 20.0) / 20.0
+        # Weighted normalization to emphasize closer obstacles
+        max_distance = 10.0  # Max LiDAR range
+        distances_normalized = 1.0 - np.clip(distances / max_distance, 0, 1)
 
-        # Combine into single state vector
-        state = np.concatenate([
-            position_normalized,      # 2 values
-            speed_normalized,         # 2 values
-            orientation_normalized,   # 1 value
-            distances_normalized      # reduced lidar values
-        ]).astype(np.float32)
+        # 2. Process and normalize other state components
+        position = np.array(pose[:2]).flatten()  # Extract (x, y) position
+        speed = np.array(velocity[:2]).flatten()  # Extract linear velocity in (x, y)
+        yaw_rate = np.array([velocity[5]]).flatten()  # Extract yaw rate
+        orientation = np.array([pose[5]]).flatten()  # Extract orientation (yaw angle)
 
-        return state
+        # Normalize components
+        position_normalized = np.clip(position / 50.0, -1.0, 1.0)  # Position is normalized within a 50x50 area
+        speed_normalized = np.clip(speed / 10.0, -1.0, 1.0)  # Max speed assumed to be 10 m/s
+        yaw_rate_normalized = np.clip(yaw_rate / 3.0, -1.0, 1.0)  # Yaw rate normalized by a max of 3 rad/s
+        orientation_normalized = np.clip(orientation / np.pi, -1.0, 1.0)  # Orientation normalized to [-1, 1]
+
+        # 3. Concatenate all components into a single state vector
+        state_components = [
+            position_normalized,
+            speed_normalized,
+            yaw_rate_normalized,
+            orientation_normalized,
+            distances_normalized
+        ]
+
+        # Ensure all components are 1D arrays for concatenation
+        for i, component in enumerate(state_components):
+            if component.ndim == 0:
+                state_components[i] = np.array([component])
+
+        # Final state vector
+        final_state = np.concatenate(state_components).astype(np.float32)
+        
+        return final_state
+
 
     def reset(self, **kwargs):
         obs, info = self.env.reset(**kwargs)
@@ -43,22 +69,56 @@ class RacecarWrapper(gym.Wrapper):
     def step(self, action):
         obs, reward, terminated, truncated, info = self.env.step(action)
         processed_obs = self._process_observation(obs)
-        
-        # Modify reward
+
+        # Initialize modified reward with environment reward
         modified_reward = reward
+
+        # Penalize large steering to encourage smoother actions
+        modified_reward -= abs(action['steering']) * 0.1
+
+        # Progress reward
         if info.get('progress', 0) > 0:
-            modified_reward += info['progress'] * 0.1
+            modified_reward += info['progress'] * 0.8
+
+        # Encourage small steering adjustments
+        if abs(action['steering']) < 0.1:
+            modified_reward += 0.5
+
+        # Penalty for collisions with walls
         if info.get('wall_collision', False):
-            modified_reward -= 1.0
-            
+            modified_reward -= 5.0  # Stronger penalty for collisions
+
+        # Encourage staying away from walls based on LiDAR
+        lidar = obs['lidar']  # Assuming raw LiDAR data is in the observation
+        normalized_distances = 1.0 - np.clip(lidar / 10.0, 0, 1)  # Normalize distances
+
+        # Penalize being too close to walls on the right, left, and front
+        left_zone = np.mean(normalized_distances[:len(normalized_distances) // 3])  # Left-side LiDAR readings
+        front_zone = np.mean(normalized_distances[len(normalized_distances) // 3:2 * len(normalized_distances) // 3])  # Front LiDAR
+        right_zone = np.mean(normalized_distances[2 * len(normalized_distances) // 3:])  # Right-side LiDAR readings
+
+        # Reward for maintaining safe distance from walls
+        safe_distance = 0.7  # Adjust threshold for safe distance (higher = safer)
+        left_penalty = max(0, safe_distance - left_zone) * 2.0  # Strong penalty if too close on the left
+        front_penalty = max(0, safe_distance - front_zone) * 3.0  # Stronger penalty if too close in front
+        right_penalty = max(0, safe_distance - right_zone) * 2.0  # Strong penalty if too close on the right
+
+        # Add penalties to the reward
+        modified_reward -= left_penalty
+        modified_reward -= front_penalty
+        modified_reward -= right_penalty
+
+
         return processed_obs, modified_reward, terminated, truncated, info
+
+
 
     @property
     def observation_space(self):
-        # 2 (position) + 2 (speed) + 1 (orientation) + 108 (lidar) = 113
+        # 2 (position) + 2 (speed) + 1 (yaw_rate) + 1 (orientation) + 7 (lidar) = 13
         return gym.spaces.Box(
             low=-np.inf,
             high=np.inf,
-            shape=(113,),
+            shape=(13,),
             dtype=np.float32
         )
