@@ -1,33 +1,27 @@
 import numpy as np
 
-def get_dynamic_steering_scale(lidar_data, safe_distance=1.5):
-    """
-    Calculate a dynamic steering scale based on LiDAR data.
+def get_dynamic_steering_scale(lidar_data):
+    """ lidar_data: [left90, left60, left30, front, right30, right60, right90]
+    Here, higher values mean the path is clearer (farther from obstacles). """
     
-    Parameters:
-    - lidar_data (np.ndarray): Array of LiDAR distances.
-    - safe_distance (float): Threshold for safe distance. Default is 1.5 meters.
-    
-    Returns:
-    - float: Steering scale for dynamic adjustment.
-    """
-    # Clip LiDAR data to a maximum range
-    lidar_distances = np.clip(lidar_data, 0, 10.0)  # Assuming 10 meters max range
+    left = np.max(lidar_data[:3])    # Best left-side clearance
+    front = lidar_data[3]            # Front clearance
+    right = np.max(lidar_data[4:])   # Best right-side clearance
 
-    # Divide LiDAR data into zones: left, front, right
-    num_zones = len(lidar_distances) // 3
-    left_zone = np.mean(lidar_distances[:num_zones])
-    front_zone = np.mean(lidar_distances[num_zones:2 * num_zones])
-    right_zone = np.mean(lidar_distances[2 * num_zones:])
-
-    # Adjust steering scale based on LiDAR readings
-    if front_zone < safe_distance:  # Obstacle in front, allow sharper turns
-        steering_scale = 0.02
-    elif left_zone < safe_distance:  # Obstacle on left, prioritize right turn
-        steering_scale = 1.0  # Scale for sharp right turn
-    elif right_zone < safe_distance:  # Obstacle on right, prioritize left turn
-        steering_scale = -1.0  # Scale for sharp left turn
-    else:  # Path is clear
-        steering_scale = 0.005  # Small turn for open path
+    # If the front has enough clearance, steer slightly toward the side that has more room
+    safe_distance = 0.5
+    if front > safe_distance:
+        # If right side is more open, turn a bit right; if left side is more open, turn a bit left
+        # Note: If right is bigger, that side is clearer, so maybe steer toward it
+        steering_scale = 0.1 * (1 if right > left else -1)
+    elif left > safe_distance:
+        # Front not safe, but left is safer than right
+        steering_scale = -0.2  # Turn left slightly (since left is clearer)
+    elif right > safe_distance:
+        # Front not safe, left not safe, but right is safer
+        steering_scale = 0.2   # Turn right slightly
+    else:
+        # No good clear direction, maybe just turn slightly in one direction
+        steering_scale = 0.1
 
     return steering_scale

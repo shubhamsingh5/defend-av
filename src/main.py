@@ -51,8 +51,8 @@ class Visualizer:
             pygame.quit()
 
 def get_scenario_path(config):
-    current_dir = os.path.dirname(os.path.abspath(__file__))  # Gets src directory
-    scenario_name = config.get('scenario', 'austria.yml')  # Default to austria if not specified
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    scenario_name = config.get('scenario', 'austria.yml')
     scenario_path = os.path.join(current_dir, 'scenarios', scenario_name)
     print(f"Looking for scenario at: {scenario_path}")
     return scenario_path
@@ -73,7 +73,7 @@ def setup_environment(render_mode='rgb_array_follow', config=None):
 
 def setup_logging(config):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_dir = Path(f"runs/dqn/{timestamp}")
+    log_dir = Path(f"runs/{config['model_type']}/{timestamp}")
     log_dir.mkdir(parents=True, exist_ok=True)
     
     # Save config

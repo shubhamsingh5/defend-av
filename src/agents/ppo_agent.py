@@ -23,14 +23,13 @@ class PPOAgent:
         self.gamma = config.get('gamma', 0.99)
         self.gae_lambda = config.get('gae_lambda', 0.95)
         self.max_grad_norm = config.get('max_grad_norm', 0.5)
-        self.entropy_coef = 0.5  # Add entropy bonus
-        self.min_std = 0.1
+        self.entropy_coef = 0.3  # Add entropy bonus
         self.episode_count = 0
-        self.std_init = 15  # Higher initial exploration
-        self.std_decay = 0.99995  # Much slower decay
-        self.std_min = 0.3  # Higher minimum exploration
+        self.std_init = 0.5  # Higher initial exploration
+        self.std_decay = 0.9995  # Much slower decay
+        self.std_min = 0.1 # Higher minimum exploration
         self.current_std = self.std_init
-        self.action_momentum = 0.9
+        self.action_momentum = 0.0
         self.speed_scale = 0.0  # For curriculum learning
 
         
@@ -70,7 +69,7 @@ class PPOAgent:
                 
         # Update exploration and curriculum
         self.current_std = max(self.std_min, self.current_std * self.std_decay)
-        self.speed_scale = min(1.0, self.speed_scale + 0.00001)  # Gradually increase speed
+        self.speed_scale = min(1.0, self.speed_scale + 0.000001)  # Gradually increase speed
         
         action_np = action.cpu().squeeze(0).numpy()
         
@@ -80,12 +79,12 @@ class PPOAgent:
             action_np = self.action_momentum * prev_action + (1 - self.action_momentum) * action_np
             
         lidar_data = state[6:]
-        steering_scale = get_dynamic_steering_scale(lidar_data)
-        print(f"Steering scale: {steering_scale}")
+        # steering_scale = get_dynamic_steering_scale(lidar_data)
+
         # Convert actions
         motor = 0.1 * (action_np[0] + 1.0)  # Convert to [0,1]
         motor = 0.2 + (1.0 - 0.2) * motor * self.speed_scale  # Apply curriculum
-        steering = np.clip(action_np[1] * steering_scale, -1, 1)
+        steering = np.clip(action_np[1], -1, 1 )
         
         return {
             'motor': float(motor),
@@ -124,7 +123,7 @@ class PPOAgent:
                 old_log_prob_batch = old_log_probs[batch_indices]
                 advantage_batch = advantages[batch_indices]
                 return_batch = returns[batch_indices]
-                
+                advantage_batch = (advantage_batch - advantage_batch.mean()) / (advantage_batch.std() + 1e-8)
                 # Current policy
                 mean, log_std = self.actor(state_batch)
                 std = log_std.exp()
@@ -141,8 +140,10 @@ class PPOAgent:
                 value_pred = self.critic(state_batch).squeeze()
                 value_loss = 0.5 * (return_batch - value_pred).pow(2).mean()
                 
+                # Dynamic entropy coefficient
+                current_entropy_coef = self.entropy_coef * (1 - self.speed_scale)
                 entropy = dist.entropy().mean()
-                loss = policy_loss + value_loss - self.entropy_coef * entropy
+                loss = policy_loss + value_loss - current_entropy_coef * entropy
                 
                 # Update networks
                 self.actor_optimizer.zero_grad()

@@ -143,14 +143,13 @@ def train(env, agent, config, log_dir, visualizer):
             state = next_state
             
             if terminated or truncated:
-                # Handle short episode detection
-                if episode_steps < short_episode_threshold:
-                    short_episode_counter += 1
-                    print(f"\nCrashed after {episode_steps} steps")  # Print steps at crash
-                else:
-                    short_episode_counter = 0
-                    if hasattr(agent, 'epsilon') and original_epsilon:
-                        agent.epsilon = original_epsilon
+                # # Handle short episode detection
+                # if episode_steps < short_episode_threshold:
+                #     short_episode_counter += 1
+                # else:
+                #     short_episode_counter = 0
+                #     if hasattr(agent, 'epsilon') and original_epsilon:
+                #         agent.epsilon = original_epsilon
                 break
         
         # Update metrics

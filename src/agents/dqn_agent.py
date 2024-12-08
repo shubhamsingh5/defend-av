@@ -26,7 +26,6 @@ class DQNAgent(BaseAgent):
         self.epsilon = config['epsilon_start']
         self.epsilon_end = config['epsilon_end']
         self.epsilon_decay = config['epsilon_decay']
-        self.action_step_size = config['action_step_size']
         self.batch_size = config['batch_size']
         self.target_update_freq = config['target_update_freq']
         self.num_motor_bins = 15  # Number of discrete motor actions
@@ -46,7 +45,6 @@ class DQNAgent(BaseAgent):
 
     def select_action(self, state, training=True):
         if training and random.random() < self.epsilon:
-            # Random action
             return {
                 'motor': random.uniform(-1, 1),
                 'steering': random.uniform(-1, 1)
