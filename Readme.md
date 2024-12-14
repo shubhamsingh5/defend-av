@@ -22,8 +22,9 @@ dl-project/
 │   ├── models/            # Neural network architectures
 │   └── scripts/           # Training and evaluation scripts
 ├── configs/               # Configuration files
-├── checkpoints/           # Saved model weights
-└── results/               # Training logs and visualizations
+├── scenarios/            # Race track configurations
+├── runs/                 # Training logs and model checkpoints
+└── requirements.txt      # Project dependencies
 ```
 
 ## Usage
@@ -33,22 +34,54 @@ dl-project/
 mode: 'train'  # or 'eval'
 agent: 'dqn'   # type of agent to use
 render: false  # whether to render environment
+### Training
 
-# Training parameters
-train:
-  episodes: 1000
-  train_freq: 100
-  batch_size: 320
-  # ... other parameters
-
-# Agent parameters
-dqn:
-  hidden_size: 256
-  learning_rate: 0.001
-  # ... other parameters
+1. Configure your training settings in `configs/{MODEL}_config.yaml`:
+```yaml
+model: "ppo"              # Options: "dqn", "ppo", "ppo_sb3"
+mode: "train"             # Options: "train", "eval"
+scenario: "austria.yml"   # Race track configuration
+...other hyperparameters
 ```
 
-2. Run training:
+2. Start training:
 ```bash
-python src/main.py
+python src/main.py --config path/to/config.yaml
 ```
+
+### Evaluation
+
+1. Update your config file to evaluation mode and specify the checkpoint:
+```yaml
+mode: "eval"
+checkpoint: "path/to/model_or_checkpoint"
+```
+
+2. Run evaluation:
+```bash
+python src/main.py --config path/to/config.yaml
+```
+
+## Models
+
+The project includes three main types of agents:
+
+1. **DQN (Deep Q-Network)**
+   - Discrete action space
+   - Experience replay
+   - Target network for stable training
+
+2. **PPO (Proximal Policy Optimization)**
+   - Continuous action space
+   - On-policy learning
+   - Adaptive exploration
+
+3. **SB3 PPO (Stable-Baselines3 Implementation)**
+
+## Monitoring
+
+Training progress is automatically logged and can be found in the `runs/` directory:
+- Tensorboard logs
+- Model checkpoints
+- Performance plots
+- Training metrics

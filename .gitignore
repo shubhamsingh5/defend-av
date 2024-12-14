@@ -22,7 +22,7 @@ wheels/
 *.egg
 
 # Project specific
-runs/
+runs*/
 logs/
 checkpoints/
 results/
