@@ -1,0 +1,38 @@
+# Run settings
+mode: train  # train or eval
+render: false
+record: false
+checkpoint: null  # path to checkpoint for evaluation
+
+# Model settings
+model_type: dqn  # dqn or ppo
+use_camera: true  # Enable or disable the use of RGB camera
+frame_skip: 1     # Skip frames for faster stepping when using camera
+
+# Camera settings (only used if use_camera is true)
+target_size: [40, 30]  # Smaller image size
+grayscale: true    # Use grayscale instead of RGB
+
+scenario: austria-rgb.yml
+
+# DQN Hyperparameters
+learning_rate: 0.001
+gamma: 0.99
+hidden_size: 512
+episodes: 10000
+train_freq: 50
+min_samples: 2000
+batch_size: 256
+short_episode_threshold: 100
+max_short_episodes: 5
+
+# Exploration
+epsilon_start: 1.0
+epsilon_end: 0.001
+epsilon_decay: 0.999
+
+# Memory
+buffer_size: 100000
+
+# Network update
+target_update_freq: 10

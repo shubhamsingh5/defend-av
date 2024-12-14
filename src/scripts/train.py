@@ -1,19 +1,19 @@
+import time
 import numpy as np
 import torch
 from pathlib import Path
 from datetime import datetime
 import matplotlib.pyplot as plt
-from collections import deque
 import json
 from tqdm import tqdm
 
-def update_metrics(metrics, episode_reward, episode_length, progress, loss, learning_rate=None):
+def update_metrics(metrics, episode_reward, episode_length, progress, loss, epsilon=None):
     metrics['episode_rewards'].append(episode_reward)
     metrics['episode_lengths'].append(episode_length)
     metrics['progress_values'].append(progress)
     metrics['losses'].append(loss)
-    if learning_rate is not None:
-        metrics['learning_rates'].append(learning_rate)
+    if epsilon is not None:
+        metrics['epsilon_values'].append(epsilon)
     
     # Update running averages
     window = 100
@@ -49,18 +49,19 @@ def plot_metrics(metrics, log_dir):
     plt.plot(smoothed_loss, label=f'Average Loss ({window} steps)')
     plt.xlabel('Training Step')
     plt.ylabel('Loss')
-    plt.yscale('log')  # Loss is often better viewed in log scale
+    plt.yscale('log')
     plt.legend()
     plt.savefig(log_dir / 'loss.png')
     plt.close()
     
-    if metrics['learning_rates']:
+    # Plot epsilon decay if using DQN
+    if 'epsilon_values' in metrics and metrics['epsilon_values']:
         plt.figure(figsize=(10, 6))
-        plt.plot(metrics['learning_rates'])
+        plt.plot(metrics['epsilon_values'])
         plt.xlabel('Episode')
-        plt.ylabel('Learning Rate')
-        plt.yscale('log')
-        plt.savefig(log_dir / 'learning_rates.png')
+        plt.ylabel('Epsilon')
+        plt.title('Epsilon Decay Over Training')
+        plt.savefig(log_dir / 'epsilon_decay.png')
         plt.close()
 
 def save_metrics(metrics, log_dir):
@@ -68,27 +69,21 @@ def save_metrics(metrics, log_dir):
     with open(metrics_file, 'w') as f:
         json.dump(metrics, f, indent=4)
 
-def train(env, agent, config, log_dir, visualizer):
+def train(env, agent, config, log_dir):
     # Initialize metrics tracking
     metrics = {
         'episode_rewards': [],
         'episode_lengths': [],
         'progress_values': [],
-        'learning_rates': [],
         'avg_rewards': [],
-        'losses': []
+        'losses': [],
+        'epsilon_values': [] if hasattr(agent, 'epsilon') else None
     }
     
     # Training parameters
-    train_freq = config.get('train_freq', 100)     # Train every 100 steps
-    batch_size = config.get('batch_size', 320)
-    min_samples = max(batch_size * 2, 1000)        # Minimum samples before training
+    train_freq = config['train_freq']
+    min_samples = config['min_samples']
     
-    # Short episode handling
-    short_episode_threshold = config.get('short_episode_threshold', 50)
-    max_short_episodes = config.get('max_short_episodes', 5)
-    short_episode_counter = 0
-    original_epsilon = agent.epsilon if hasattr(agent, 'epsilon') else None
     
     best_reward = float('-inf')
     episode_loss = []
@@ -97,18 +92,12 @@ def train(env, agent, config, log_dir, visualizer):
     # Initialize progress bar for episodes
     pbar = tqdm(range(config['episodes']), desc='Training')
     
+    steps_since_train = 0
     for episode in pbar:
         state, _ = env.reset()
         episode_reward = 0
         episode_steps = 0
         episode_loss.clear()
-        steps_since_train = 0
-        
-        # Check if stuck in short episodes
-        if short_episode_counter >= max_short_episodes and hasattr(agent, 'epsilon'):
-            agent.epsilon = min(1.0, agent.epsilon * 2)
-            short_episode_counter = 0
-            print("\nIncreasing exploration due to repeated short episodes")
         
         while True:
             # Select and perform action
@@ -119,38 +108,19 @@ def train(env, agent, config, log_dir, visualizer):
             agent.store_transition(state, action, reward, next_state, terminated)
             total_steps += 1
             
-            # Initial sample collection phase
-            if total_steps < min_samples:
-                if total_steps % 100 == 0:
-                    pbar.set_postfix({'status': f'Collecting initial samples: {total_steps}/{min_samples}'})
-            else:
-                # Normal training phase
+            if total_steps >= min_samples:
                 steps_since_train += 1
                 if steps_since_train >= train_freq:
                     loss = agent.train_step()
                     if loss is not None:
                         episode_loss.append(loss)
                     steps_since_train = 0
-
-            
-            # Render if visualizer is active
-            if episode_steps % 2 == 0:
-                frame = env.render()
-                visualizer.render_frame(frame)
             
             episode_reward += reward
             episode_steps += 1
             state = next_state
             
             if terminated or truncated:
-                # Handle short episode detection
-                if episode_steps < short_episode_threshold:
-                    short_episode_counter += 1
-                    print(f"\nCrashed after {episode_steps} steps")  # Print steps at crash
-                else:
-                    short_episode_counter = 0
-                    if hasattr(agent, 'epsilon') and original_epsilon:
-                        agent.epsilon = original_epsilon
                 break
         
         # Update metrics
@@ -161,7 +131,7 @@ def train(env, agent, config, log_dir, visualizer):
             episode_steps,
             info.get('progress', 0),
             avg_episode_loss,
-            agent.learning_rate if hasattr(agent, 'learning_rate') else None
+            agent.epsilon if hasattr(agent, 'epsilon') else None
         )
         
         # Save best model
@@ -177,15 +147,20 @@ def train(env, agent, config, log_dir, visualizer):
         
         # Update progress bar with current metrics
         avg_reward = np.mean(metrics['episode_rewards'][-100:]) if metrics['episode_rewards'] else 0
-        pbar.set_postfix({
+        pbar_postfix = {
             'reward': f'{episode_reward:.2f}',
             'avg_reward': f'{avg_reward:.2f}',
             'progress': f'{info.get("progress", 0):.2f}',
             'loss': f'{avg_episode_loss:.3e}' if episode_loss else 'N/A',
             'samples': total_steps,
-            'short_eps': short_episode_counter,
-            'steps': episode_steps        # Add current episode steps
-        })
+            'steps': episode_steps,
+        }
+        
+        # Add epsilon to progress bar if using DQN
+        if hasattr(agent, 'epsilon'):
+            pbar_postfix['epsilon'] = f'{agent.epsilon:.3f}'
+            
+        pbar.set_postfix(pbar_postfix)
     
     # Final saves
     agent.save(log_dir / 'final_model.pth')

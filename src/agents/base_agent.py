@@ -25,11 +25,6 @@ class BaseAgent(ABC):
     def store_transition(self, state, action, reward, next_state, done):
         """Store transition in memory"""
         pass
-    
-    @abstractmethod
-    def process_state(self, state):
-        """Convert environment state to tensor"""
-        pass
 
     def save(self, path):
         """Save agent's state"""
