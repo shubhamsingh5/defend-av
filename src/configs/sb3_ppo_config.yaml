@@ -1,6 +1,6 @@
 mode: train
-model: dqn
-scenario: 'austria.yml'
+model: ppo_sb3
+scenario: 'columbia.yml'
 
 # DQN
 learning_rate: 0.0003
@@ -16,12 +16,12 @@ epsilon_end: 0.001
 epsilon_decay: 0.999
 
 # PPO parameters
-use_lstm: true  # or false for regular PPO
+use_lstm: false
 learning_rate: 3e-4
-n_steps: 256  # or 2048 for non-LSTM
-batch_size: 32  # or 64 for non-LSTM
+n_steps: 2048
+batch_size: 256
 n_epochs: 10
 gamma: 0.99
 gae_lambda: 0.95
 ent_coef: 0.01
-total_timesteps: 1000000
+total_timesteps: 200000

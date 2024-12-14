@@ -1,3 +1,4 @@
+import time
 from torch.distributions import Normal
 import torch
 import numpy as np
@@ -23,13 +24,13 @@ class PPOAgent:
         self.gamma = config.get('gamma', 0.99)
         self.gae_lambda = config.get('gae_lambda', 0.95)
         self.max_grad_norm = config.get('max_grad_norm', 0.5)
-        self.entropy_coef = 0.3  # Add entropy bonus
+        self.entropy_coef = 0.7  # Add entropy bonus
         self.episode_count = 0
-        self.std_init = 0.5  # Higher initial exploration
+        self.std_init = 0.7  # Higher initial exploration
         self.std_decay = 0.9995  # Much slower decay
         self.std_min = 0.1 # Higher minimum exploration
         self.current_std = self.std_init
-        self.action_momentum = 0.0
+        self.action_momentum = 0.5
         self.speed_scale = 0.0  # For curriculum learning
 
         
@@ -84,7 +85,10 @@ class PPOAgent:
         # Convert actions
         motor = 0.1 * (action_np[0] + 1.0)  # Convert to [0,1]
         motor = 0.2 + (1.0 - 0.2) * motor * self.speed_scale  # Apply curriculum
-        steering = np.clip(action_np[1], -1, 1 )
+        steering = np.clip(action_np[1], -0.5, 0.5 )
+        # print(f"State: {state}")
+        # print(f"Motor: {motor}, Steering: {steering}")
+        # time.sleep(0.5)
         
         return {
             'motor': float(motor),

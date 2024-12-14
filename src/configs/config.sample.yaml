@@ -1,19 +1,19 @@
-mode: train
 model: dqn
 scenario: 'austria.yml'
 
 # DQN
-learning_rate: 0.0003
+learning_rate: 0.001
 buffer_size: 100000
-batch_size: 256
+batch_size: 64
 gamma: 0.99
 hidden_size: 256
-episodes: 10000
-train_freq: 1024
+episodes: 1000
+train_freq: 100
 min_samples: 1000
 epsilon_start: 1.0
 epsilon_end: 0.001
 epsilon_decay: 0.999
+target_update_freq: 10
 
 # PPO parameters
 use_lstm: true  # or false for regular PPO
