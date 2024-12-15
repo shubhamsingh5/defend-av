@@ -1,5 +1,7 @@
 # DefendAV
 
+Project for UofT ECE1508: Applied Deep Learning
+
 ## Installation
 
 1. Create and activate a virtual environment:
